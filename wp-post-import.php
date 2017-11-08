@@ -139,39 +139,41 @@ if ( !class_exists('wp_post_import') ) {
 				$post_id = $post['ID'];
 				$post['import_id'] = $post_id;
 				$remote_post_id = wp_insert_post($post);
-				if ( is_wp_error( $remote_post_id ) ) {
-					$response['error'] = $result->get_error_message();
-				}
+				if ($post_type != 'attachment') {
+					if ( is_wp_error( $remote_post_id ) ) {
+						$response['error'] = $result->get_error_message();
+					}
 
-				if ( !is_wp_error( $remote_post_id )) {
-					//categories
-					if ( isset( $_REQUEST['post_taxonomies_cats'] )) {
-						$taxonomies = $_REQUEST['post_taxonomies_cats'];
-						foreach ($taxonomies as $taxonomy_slug => $terms) {
-							if ( !$terms ) {
-								$terms = array();
+					if ( !is_wp_error( $remote_post_id )) {
+						//categories
+						if ( isset( $_REQUEST['post_taxonomies_cats'] )) {
+							$taxonomies = $_REQUEST['post_taxonomies_cats'];
+							foreach ($taxonomies as $taxonomy_slug => $terms) {
+								if ( !$terms ) {
+									$terms = array();
+								}
+								$this->process_post_categories( $remote_post_id , $taxonomy_slug ,$terms  ) ;
 							}
-							$this->process_post_categories( $remote_post_id , $taxonomy_slug ,$terms  ) ;
 						}
-					}
-					//tags
-					if ( isset( $_REQUEST['post_taxonomies_tags'] )) {
-						$taxonomies = $_REQUEST['post_taxonomies_tags'];
-						foreach ($taxonomies as $taxonomy_slug => $terms) {
-							if ( !$terms ) {
-								$terms = array();
-							}
-							$this->process_post_tags( $remote_post_id , $taxonomy_slug ,$terms  ) ;
+						//tags
+						if ( isset( $_REQUEST['post_taxonomies_tags'] )) {
+							$taxonomies = $_REQUEST['post_taxonomies_tags'];
+							foreach ($taxonomies as $taxonomy_slug => $terms) {
+								if ( !$terms ) {
+									$terms = array();
+								}
+								$this->process_post_tags( $remote_post_id , $taxonomy_slug ,$terms  ) ;
 
+							}
 						}
+						
+						foreach($post_meta as $key => $value) {
+							$val = $value[0]; 
+							update_post_meta($remote_post_id,$key,$val);		
+						}
+						update_post_meta($remote_post_id, 'imported_post', 1);
+						update_post_meta($remote_post_id, 'syncdate', time());
 					}
-					
-					foreach($post_meta as $key => $value) {
-						$val = $value[0]; 
-						update_post_meta($remote_post_id,$key,$val);		
-					}
-					update_post_meta($remote_post_id, 'imported_post', 1);
-					update_post_meta($remote_post_id, 'syncdate', time());
 				}
 			}
 			$response['remote_post_id'] = $remote_post_id;

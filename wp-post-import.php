@@ -91,7 +91,7 @@ if ( !class_exists('wp_post_import') ) {
 			exit;
 		}
 
-		public static function my_var_dump( $object=null ){
+		public function my_var_dump( $object=null ){
 			ob_start();                    // start buffer capture
 			var_dump( $object );           // dump the values
 			$contents = ob_get_contents(); // put the buffer into a variable
@@ -103,7 +103,7 @@ if ( !class_exists('wp_post_import') ) {
 			
 			
 			ob_start();
-			my_var_dump($_REQUEST);
+			$this->my_var_dump($_REQUEST);
 			/*
 			$this->add_log( '************** End of Request *********************' );
 			print_r( $_REQUEST );
@@ -132,39 +132,18 @@ if ( !class_exists('wp_post_import') ) {
 			if ( $post_type == 'nav_menu_item' ) {
 				$remote_post_id =  $this->__create_update_menu();
 			} else {
-				
 				$post 				= 	$_REQUEST['post'];
 				$post_meta			=	$_REQUEST['post_meta'];
 				
 				$featuredimage_url 	= 	$_REQUEST['featuredimage_url'];
-				unset($post['ID']);
-				
-				$remote_post_id   = $post_meta['remote_post_id'];
-				$remote_post_id   = $remote_post_id[0];
-				
-				if(!empty($remote_post_id)) {
-					$postexist = get_post( $remote_post_id );
-					if ($postexist ) {
-						$post['ID']= $remote_post_id;
-						wp_update_post( $post );
-					} else {
-						$remote_post_id = wp_insert_post($post);
-						if ( is_wp_error( $remote_post_id ) ) {
-							$response['error'] = $result->get_error_message();
-						}
-					}
-					
-				} else {
-					$remote_post_id = wp_insert_post($post);
-					if ( is_wp_error( $remote_post_id ) ) {
-						$response['error'] = $result->get_error_message();
-					}
+				$post_id = $post['ID'];
+				$post['import_id'] = $post_id;
+				$remote_post_id = wp_insert_post($post);
+				if ( is_wp_error( $remote_post_id ) ) {
+					$response['error'] = $result->get_error_message();
 				}
 
 				if ( !is_wp_error( $remote_post_id )) {
-					
-					unset( $post_meta['remote_post_id'] );
-					
 					//categories
 					if ( isset( $_REQUEST['post_taxonomies_cats'] )) {
 						$taxonomies = $_REQUEST['post_taxonomies_cats'];
@@ -172,10 +151,7 @@ if ( !class_exists('wp_post_import') ) {
 							if ( !$terms ) {
 								$terms = array();
 							}
-
 							$this->process_post_categories( $remote_post_id , $taxonomy_slug ,$terms  ) ;
-							
-			
 						}
 					}
 					//tags
@@ -190,89 +166,14 @@ if ( !class_exists('wp_post_import') ) {
 						}
 					}
 					
-
-					if(!empty($featuredimage_url)) {
-						$previousimageurl = get_post_meta( $remote_post_id , 'featuredimage_url' , true  );
-						//only update if we got a new featured image
-						if ( empty( $previousimageurl) || $previousimageurl != $featuredimage_url) {
-							$this->add_attachment($featuredimage_url, $remote_post_id);	
-							$post_meta['featuredimage_url'][0] = $featuredimage_url;
-						}
-						
-					}
-
-					//if post type woocommerce product then Upload gallery image
-					if ( $post['post_type'] == 'product') {
-						$galleryimages 	= 	$_REQUEST['product_image_gallery_urls'];
-						$insertedgalleriesids = array();
-						$insertedgalleriesurls = array();
-
-						$previousgalleryurls = get_post_meta( $remote_post_id , '_product_image_gallery_urls' , true  );
-						if ( empty( $previousgalleryurls)) {
-							$previousgalleryurls = array();
-						}
-						foreach ($galleryimages as $key => $url) {
-							if ( in_array( $url,  $previousgalleryurls )) {
-								$id = array_search( $url, $previousgalleryurls );
-							} else {
-								$id = $this->add_attachment($url,$remote_post_id,$is_featured = false);	
-							}
-							$insertedgalleriesids[] 		= $id;
-							$insertedgalleriesurls[ $id ] 	= $url;
-							
-						}
-						$post_meta['_product_image_gallery'][0] = implode(",", $insertedgalleriesids);
-						//let save the url so we don't download every time
-						$post_meta['_product_image_gallery_urls'][0] = $insertedgalleriesurls;
-					}
-
-					
-					/* make it compatible with SEO Yoast */
-
-					//check SEO Yoast plugin is enabled and we have seo fb/gp image
-					if ( isset( $post_meta['_yoast_wpseo_opengraph-image'])) {
-						$yoast_fb_url = @$post_meta['_yoast_wpseo_opengraph-image'][0];
-						$previousimageurl = get_post_meta( $remote_post_id , 'yoast_fb_url' , true  );
-						//only update if we got a new featured image
-						if ( empty( $previousimageurl) || $previousimageurl != $yoast_fb_url) {
-							if ( !empty( $yoast_fb_url )) {
-								$attach_id = $this->add_attachment($yoast_fb_url,$remote_post_id,$is_featured = false);	
-								$post_meta['yoast_fb_url'][0] = $yoast_fb_url;
-								$post_meta['_yoast_wpseo_opengraph-image'][0] = wp_get_attachment_url( $attach_id );
-							}
-						}
-					}
-
-					if ( isset( $post_meta['_yoast_wpseo_google-plus-image'])) {
-						$yoast_gp_url = @$post_meta['_yoast_wpseo_google-plus-image'][0];
-						$previousimageurl = get_post_meta( $remote_post_id , 'yoast_gp_url' , true  );
-						//only update if we got a new featured image
-						if ( empty( $previousimageurl) || $previousimageurl != $yoast_gp_url) {
-							if ( !empty( $yoast_gp_url )) {
-								$attach_id = $this->add_attachment($yoast_gp_url,$remote_post_id,$is_featured = false);	
-								$post_meta['yoast_gp_url'][0] = $yoast_gp_url;
-								$post_meta['_yoast_wpseo_google-plus-image'][0] = wp_get_attachment_url( $attach_id );
-							}
-						}
-					}
-					/* we are SEO Yoast Compatiable */
-					
-
-
 					foreach($post_meta as $key => $value) {
 						$val = $value[0]; 
 						update_post_meta($remote_post_id,$key,$val);		
 					}
 					update_post_meta($remote_post_id, 'imported_post', 1);
 					update_post_meta($remote_post_id, 'syncdate', time());
-					$this->add_log( '************** after edit End *********************' );
-					
-					$output = ob_get_clean();	
-					$this->add_log( $output );
 				}
 			}
-			//echo $output;
-			//send back the remote post id
 			$response['remote_post_id'] = $remote_post_id;
 			echo  json_encode($response);
 			exit;

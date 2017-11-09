@@ -101,15 +101,11 @@ if ( !class_exists('wp_post_import') ) {
 
 		function create_update_post() {
 			
-			
-			ob_start();
-			$this->my_var_dump($_REQUEST);
 			/*
 			$this->add_log( '************** End of Request *********************' );
 			print_r( $_REQUEST );
 			*/
 
-			
 			$response['remote_post_id'] = 	'';
 			$response['error'] 			= 	'';
 			$remote_post_id				=	'';
@@ -138,8 +134,30 @@ if ( !class_exists('wp_post_import') ) {
 				$featuredimage_url 	= 	$_REQUEST['featuredimage_url'];
 				$post_id = $post['ID'];
 				$post['import_id'] = $post_id;
-				$remote_post_id = wp_insert_post($post);
-				if ($post_type != 'attachment') {
+
+//				$this->my_var_dump($post);
+				$remote_post_id = wp_insert_post($post, true);
+
+				$myvals = get_post_meta($remote_post_id);
+				foreach($myvals as $key=>$val)  {
+					delete_post_meta($remote_post_id, $key);
+				}
+				
+				foreach($post_meta as $key => $value) {
+					$val = $value[0]; 
+					update_post_meta($remote_post_id,$key,$val);		
+				}
+				update_post_meta($remote_post_id, 'imported_post', 1);
+				update_post_meta($remote_post_id, 'syncdate', time());
+
+
+				if ($post_type == 'attachment') 
+				{
+					global $wpdb;
+					$wpdb->query("UPDATE wp_posts SET guid ='". $post['guid'] . "' WHERE ID ='" . $post_id . "'");
+				}
+				else
+				{
 					if ( is_wp_error( $remote_post_id ) ) {
 						$response['error'] = $result->get_error_message();
 					}
@@ -167,13 +185,7 @@ if ( !class_exists('wp_post_import') ) {
 							}
 						}
 						
-						foreach($post_meta as $key => $value) {
-							$val = $value[0]; 
-							update_post_meta($remote_post_id,$key,$val);		
-						}
-						update_post_meta($remote_post_id, 'imported_post', 1);
-						update_post_meta($remote_post_id, 'syncdate', time());
-					}
+											}
 				}
 			}
 			$response['remote_post_id'] = $remote_post_id;

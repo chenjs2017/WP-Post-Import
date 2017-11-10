@@ -135,7 +135,9 @@ if ( !class_exists('wp_post_import') ) {
 				$post_id = $post['ID'];
 				$post['import_id'] = $post_id;
 
-//				$this->my_var_dump($post);
+				//$this->my_var_dump($post);
+				$post = apply_filters('chinese_code', $post);
+
 				$remote_post_id = wp_insert_post($post, true);
 
 				$myvals = get_post_meta($remote_post_id);
@@ -326,6 +328,7 @@ if ( !class_exists('wp_post_import') ) {
 		function __get_key(){
 			return md5( $this->__get_import_url() ); 			
 		}
+		 
 		function __import_settings(){
 		?>
 			<div class="te_main_heading" style="width: 97.3%;margin-top: 15px;padding: 10px;background:none repeat scroll 0 0 #2980b9;color:#fff;font-size: 15px;">WP Post Import</div>
@@ -336,6 +339,9 @@ if ( !class_exists('wp_post_import') ) {
 
 					<label class="te-label">Pass Key:</label>
 					<input class="te_select_input" type="text" readonly value="<?php echo $this->__get_key();?>">
+
+					<label class="te-label">Translate Option</label>
+					<input class="te_select_input" type="text"  value="<?php echo $this->__get_key();?>">
 				</div>
 			<?php /* ?>
 			<!-- Table to show lis -->

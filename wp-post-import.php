@@ -130,15 +130,34 @@ if ( !class_exists('wp_post_import') ) {
 			} else {
 				$post 				= 	$_REQUEST['post'];
 				$post_meta			=	$_REQUEST['post_meta'];
-				
-				$featuredimage_url 	= 	$_REQUEST['featuredimage_url'];
-				$post_id = $post['ID'];
-				$post['import_id'] = $post_id;
 
-				//$this->my_var_dump($post);
+//				$this->my_var_dump($post);
+				$old_id = (string)$post['ID'];
+				unset($post['ID']);
+				unset($post['post_name']);
 				$post = apply_filters('chinese_code', $post);
 
-				$remote_post_id = wp_insert_post($post, true);
+				$remote_post_id   = $post_meta['remote_post_id'];
+				$remote_post_id   = $remote_post_id[0];
+				
+				if(!empty($remote_post_id)) {
+					$postexist = get_post( $remote_post_id );
+					if ($postexist ) {
+						$post['ID']= $remote_post_id;
+						wp_update_post( $post );
+					} else {
+						$remote_post_id = wp_insert_post($post);
+						if ( is_wp_error( $remote_post_id ) ) {
+							$response['error'] = $result->get_error_message();
+						}
+					}
+					
+				} else {
+					$remote_post_id = wp_insert_post($post);
+					if ( is_wp_error( $remote_post_id ) ) {
+						$response['error'] = $result->get_error_message();
+					}
+				}
 
 				$myvals = get_post_meta($remote_post_id);
 				foreach($myvals as $key=>$val)  {
@@ -146,17 +165,40 @@ if ( !class_exists('wp_post_import') ) {
 				}
 				
 				foreach($post_meta as $key => $value) {
-					$val = $value[0]; 
-					update_post_meta($remote_post_id,$key,$val);		
+					foreach($value as $val) {
+						add_post_meta($remote_post_id,$key,$val);		
+					}
 				}
+
 				update_post_meta($remote_post_id, 'imported_post', 1);
 				update_post_meta($remote_post_id, 'syncdate', time());
 
-
 				if ($post_type == 'attachment') 
 				{
+					$post_parent = $post['post_parent'];
+
+					$myvals = get_post_meta($post_parent);
+	                foreach($myvals as $key=>$valarr)  {
+						foreach($valarr as $val) {
+							if ($val == $old_id) {
+								update_post_meta($post_parent, $key, $remote_post_id, $val);
+							}else {
+
+								$find = strpos((string)$val,$old_id); 
+
+								if($find != false) {
+									error_log('find ---!');
+									$new_val = str_replace($old_id,$remote_post_id, $val);
+									error_log('new val=' . $new_val);
+									$result = update_post_meta($post_parent, $key, $new_val);
+									$this->my_var_dump($result);
+								}
+							}
+						}
+                 	}
+
 					global $wpdb;
-					$wpdb->query("UPDATE wp_posts SET guid ='". $post['guid'] . "' WHERE ID ='" . $post_id . "'");
+					$wpdb->query("UPDATE wp_posts SET guid ='". $post['guid'] . "' WHERE ID ='" . $remote_post_id . "'");
 				}
 				else
 				{
@@ -183,11 +225,9 @@ if ( !class_exists('wp_post_import') ) {
 									$terms = array();
 								}
 								$this->process_post_tags( $remote_post_id , $taxonomy_slug ,$terms  ) ;
-
 							}
 						}
-						
-											}
+					}
 				}
 			}
 			$response['remote_post_id'] = $remote_post_id;
